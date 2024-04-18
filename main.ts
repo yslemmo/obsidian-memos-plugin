@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS: MemosSyncPluginSettings = {
   interval: 0,
 }
 
+
 function formatDateToFileFormat(date: Date) {
   const year = date.getFullYear()
   const month = date.getMonth() + 1
@@ -128,6 +129,9 @@ export default class MemosSyncPlugin extends Plugin {
       const vault = this.app.vault
       const adapter = this.app.vault.adapter
 
+      const itemsPerFile = 100;
+      const numberOfFiles = Math.ceil(memos.length / itemsPerFile);
+
       const isMemosFolderExists = await adapter.exists(`${folderToSync}/memos`)
       if (!isMemosFolderExists) {
         await vault.createFolder(`${folderToSync}/memos`)
@@ -139,23 +143,37 @@ export default class MemosSyncPlugin extends Plugin {
         await vault.createFolder(`${folderToSync}/resources`)
       }
 
-      memos.forEach((memo) => {
-        const memoPath = normalizePath(
-          `${folderToSync}/memos/${getFileName(
-            memo,
-            this.settings.fileNameFormat,
-          )}.md`,
-        )
-        const memoContent = getNoteContent(memo)
-        const lastUpdated = memo.metadata.updatedAt
+      for (let i = 0; i < numberOfFiles; i++) {
+        // 每个文件的条目范围
+        const start = i * itemsPerFile;
+        const end = start + itemsPerFile;
+        const memosSlice = memos.slice(start, Math.min(end, memos.length));
+  
+        // 创建文件内容
+        const fileContent = memosSlice.map(memo => `## ${getFileName(memo,this.settings.fileNameFormat,)} \n${memo.content}\n----`).join('\n');
+  
+        // 文件路径
+        const filePath = normalizePath(`${this.settings.folderToSync}/memos/${i + 1}.md`);
+        await this.app.vault.create(filePath, fileContent);
+      }
 
-        if (lastSyncTime && lastUpdated && lastUpdated * 1000 < lastSyncTime) {
-          return
-        }
-        adapter.write(memoPath, memoContent).catch((e) => {
-          console.error(e)
-        })
-      })
+      // memos.forEach((memo) => {
+      //   const memoPath = normalizePath(
+      //     `${folderToSync}/memos/${getFileName(
+      //       memo,
+      //       this.settings.fileNameFormat,
+      //     )}.md`,
+      //   )
+      //   const memoContent = getNoteContent(memo)
+      //   const lastUpdated = memo.metadata.updatedAt
+
+      //   if (lastSyncTime && lastUpdated && lastUpdated * 1000 < lastSyncTime) {
+      //     return
+      //   }
+      //   adapter.write(memoPath, memoContent).catch((e) => {
+      //     console.error(e)
+      //   })
+      // })
 
       for (const resource of res.files) {
         const resourcePath = normalizePath(
@@ -237,6 +255,12 @@ export default class MemosSyncPlugin extends Plugin {
       console.error(e)
     }
   }
+
+  formatMemo(memo: Note) {
+    // 格式化 memo 的实现，例如：
+    return `### 222\n${memo.content}`;
+  }
+
 }
 
 class MemosSyncSettingTab extends PluginSettingTab {
